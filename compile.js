@@ -67,16 +67,18 @@ fs.writeFileSync(
   JSON.stringify({ abi, bytecode }, null, 2)
 );
 
-// Write to zyron-frontend/lib/zyron-contract.ts
+// Write to frontend/lib/zyron-contract.ts
 const frontendTs = `// Auto-generated contract ABI and deployment artifact for ZyronAttestation.sol
 export const ZYRON_ATTESTATION_ABI = ${JSON.stringify(abi, null, 2)};
 
 export const ZYRON_ATTESTATION_BYTECODE = '${bytecode}';
 `;
 
-fs.writeFileSync(
-  path.resolve(__dirname, '..', 'zyron-frontend', 'lib', 'zyron-contract.ts'),
-  frontendTs
-);
+const frontendDir = fs.existsSync(path.resolve(__dirname, '..', 'frontend', 'lib'))
+  ? path.resolve(__dirname, '..', 'frontend', 'lib')
+  : path.resolve(__dirname, '..', 'zyron-frontend', 'lib');
 
-console.log('Updated zyron-frontend/lib/zyron-contract.ts');
+const frontendDest = path.resolve(frontendDir, 'zyron-contract.ts');
+fs.writeFileSync(frontendDest, frontendTs);
+
+console.log('Updated ' + frontendDest);

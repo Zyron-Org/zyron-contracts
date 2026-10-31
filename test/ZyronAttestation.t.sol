@@ -148,4 +148,76 @@ contract ZyronAttestationTest is Test {
         vm.expectRevert("ZyronAttestation: No verified attestation found for this audit ID");
         attestation.verifyAttestation(auditId);
     }
+
+    // ─── MONAD TESTNET TESTS (CHAIN ID 10143) ──────────────────
+
+    function test_MonadTestnetChainId() public {
+        vm.chainId(10143);
+        assertEq(block.chainid, 10143);
+
+        ZyronAttestation monadAttestation = new ZyronAttestation(operator);
+        assertEq(monadAttestation.operator(), operator);
+        assertEq(monadAttestation.admin(), address(this));
+
+        (
+            bytes1 fields,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            bytes32 salt,
+            uint256[] memory extensions
+        ) = monadAttestation.eip712Domain();
+
+        assertEq(chainId, 10143);
+        assertEq(verifyingContract, address(monadAttestation));
+        assertEq(keccak256(bytes(name)), keccak256(bytes("ZyronAttestation")));
+        assertEq(keccak256(bytes(version)), keccak256(bytes("3.0.0")));
+    }
+
+    function test_PublishAttestationWithSignature_MonadTestnet() public {
+        vm.chainId(10143);
+        uint256 auditorPrivateKey = 0xA11CE;
+        address auditorAddress = vm.addr(auditorPrivateKey);
+
+        ZyronAttestation monadAttestation = new ZyronAttestation(operator);
+        ZyronAttestation.AttestationInput memory input = _buildInput();
+        input.leadAuditor = auditorAddress;
+
+        uint8 status = 2; // MANUALLY_ATTESTED
+        uint256 timestamp = block.timestamp;
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                monadAttestation.ATTESTATION_TYPEHASH(),
+                input.auditId,
+                input.merkleRoot,
+                input.repoTreeHash,
+                input.bytecodeHash,
+                input.leadAuditor,
+                input.sloc,
+                status,
+                timestamp
+            )
+        );
+
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("ZyronAttestation")),
+                keccak256(bytes("3.0.0")),
+                10143,
+                address(monadAttestation)
+            )
+        );
+
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(auditorPrivateKey, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        uint256 tokenId = monadAttestation.publishAttestationWithSignature(input, status, timestamp, signature);
+        assertEq(tokenId, 1);
+        assertTrue(monadAttestation.verifyAttestation(auditId).isVerified);
+    }
 }
+
